@@ -1,26 +1,32 @@
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
-
-node_modules
-NEXT_RELEASE_CHANGELOG.md
-artifacts
-e2e/.env
-*.log
-.DS_STORE
-*.db
-.idea
-
-# Testing
-examples/SampleApp/fastlane/fastlane.log
-examples/SampleApp/fastlane/report.xml
-examples/SampleApp/fastlane/metrics/
-examples/SampleApp/tmp/
-index.android.bundle
-*.app
-*.DSYM.zip
-**/metrics/
 package/shared-native/.sync-state/
+
+# SonarQube
+.scannerwork/
+.sonar/
+
+# NPM
+package-lock.json
+
+# Coverage
+coverage/
+
+# Jenkins
+*.war
+jenkins.war
+jenkins.war.*
+
+# Database
+*.db-journal
+
+# Environment
+.env
+.env.*
+
+# Build
+dist/
+build/
+target/
+
+# OS
+Thumbs.db
+node_modules/
