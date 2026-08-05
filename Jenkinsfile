@@ -1,6 +1,7 @@
 pipeline {
     agent any
 
+<<<<<<< HEAD
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -18,11 +19,15 @@ pipeline {
 
     stages {
 
+=======
+    stages {
+>>>>>>> ea179b5f5 (Jenkinsfile)
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
+<<<<<<< HEAD
 
         stage('Environment Info') {
             steps {
@@ -111,3 +116,7 @@ pipeline {
         }
     }
 }
+=======
+    }
+}
+>>>>>>> ea179b5f5 (Jenkinsfile)
