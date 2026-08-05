@@ -46,25 +46,19 @@ pipeline {
 
         stage('Lint') {
             steps {
-                sh '''
-                    yarn lint
-                '''
+                sh 'yarn lint'
             }
         }
 
         stage('Unit Tests') {
             steps {
-                sh '''
-                    yarn test:unit
-                '''
+                sh 'yarn test:unit'
             }
         }
 
         stage('Build') {
             steps {
-                sh '''
-                    yarn build
-                '''
+                sh 'yarn build'
             }
         }
 
@@ -76,12 +70,12 @@ pipeline {
                     ]) {
                         sh '''
                         ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-                          -Dsonar.projectKey=ChatStreamSDK \
-                          -Dsonar.projectName=ChatStreamSDK \
-                          -Dsonar.sources=. \
-                          -Dsonar.sourceEncoding=UTF-8 \
-                          -Dsonar.host.url=$SONAR_HOST_URL \
-                          -Dsonar.token=$SONAR_TOKEN
+                        -Dsonar.projectKey=ChatStreamSDK \
+                        -Dsonar.projectName=ChatStreamSDK \
+                        -Dsonar.sources=. \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.token=$SONAR_TOKEN
                         '''
                     }
                 }
@@ -104,7 +98,6 @@ pipeline {
     }
 
     post {
-
         success {
             echo 'CI Pipeline completed successfully.'
         }
