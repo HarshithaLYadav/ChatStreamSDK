@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -23,25 +19,11 @@ pipeline {
 
     stages {
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-    stages {
->>>>>>> ea179b5f5 (Jenkinsfile)
-=======
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
-        stage('Checkout') {
-=======
         stage('1. Checkout') {
->>>>>>> 14e64bc26 (updated Jenkinsfile)
             steps {
                 checkout scm
             }
         }
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
 
         stage('2. Install, Lint & Test') {
             steps {
@@ -49,45 +31,6 @@ pipeline {
                     echo "Installing Dependencies..."
                     yarn install --frozen-lockfile
 
-<<<<<<< HEAD
-        stage('Lint') {
-            steps {
-<<<<<<< HEAD
-                sh 'yarn lint'
-=======
-                sh '''
-                    yarn lint
-                '''
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
-            }
-        }
-
-        stage('Unit Tests') {
-            steps {
-<<<<<<< HEAD
-                sh 'yarn test:unit'
-=======
-                sh '''
-                    yarn test:unit
-                '''
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
-            }
-        }
-
-        stage('Build') {
-            steps {
-<<<<<<< HEAD
-                sh 'yarn build'
-=======
-                sh '''
-                    yarn build
-                '''
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
-            }
-        }
-
-        stage('SonarQube Analysis') {
-=======
                     echo "Running Lint..."
                     yarn lint
 
@@ -98,32 +41,13 @@ pipeline {
         }
 
         stage('3. SonarQube Analysis') {
->>>>>>> 6b703f456 (updated Jenkinsfile)
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([
                         string(credentialsId: 'sonar-pat', variable: 'SONAR_TOKEN')
                     ]) {
-
                         sh """
                         ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-<<<<<<< HEAD
-                        -Dsonar.projectKey=ChatStreamSDK \
-                        -Dsonar.projectName=ChatStreamSDK \
-                        -Dsonar.sources=. \
-                        -Dsonar.sourceEncoding=UTF-8 \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
-                        -Dsonar.token=$SONAR_TOKEN
-=======
-                          -Dsonar.projectKey=ChatStreamSDK \
-                          -Dsonar.projectName=ChatStreamSDK \
-                          -Dsonar.sources=. \
-                          -Dsonar.sourceEncoding=UTF-8 \
-                          -Dsonar.host.url=$SONAR_HOST_URL \
-                          -Dsonar.token=$SONAR_TOKEN
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
-                        '''
-=======
                         -Dsonar.projectKey=ChatStream \
                         -Dsonar.projectName=ChatStream \
                         -Dsonar.sources=. \
@@ -131,7 +55,6 @@ pipeline {
                         -Dsonar.host.url=${SONAR_HOST_URL} \
                         -Dsonar.token=${SONAR_TOKEN}
                         """
->>>>>>> 6b703f456 (updated Jenkinsfile)
                     }
                 }
 
@@ -206,12 +129,9 @@ pipeline {
                       --file downloaded/ChatStream-${BUILD_NUMBER}.apk
 
                     echo "Downloaded Artifact:"
-
                     ls -lh downloaded/
 
                     echo "Artifact verification completed successfully."
-
-                    echo "CD stage completed."
                     '''
                 }
             }
@@ -219,10 +139,6 @@ pipeline {
     }
 
     post {
-<<<<<<< HEAD
-=======
-
->>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
         success {
             echo "React Native CI/CD Pipeline completed successfully."
         }
@@ -236,7 +152,3 @@ pipeline {
         }
     }
 }
-=======
-    }
-}
->>>>>>> ea179b5f5 (Jenkinsfile)
