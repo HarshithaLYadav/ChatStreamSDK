@@ -14,6 +14,7 @@ pipeline {
     environment {
         NODE_ENV = 'development'
         SONAR_SCANNER_HOME = tool 'SonarScanner'
+        STORAGE_CONTAINER = 'apk-artifacts'
     }
 
     triggers {
@@ -23,12 +24,16 @@ pipeline {
     stages {
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
     stages {
 >>>>>>> ea179b5f5 (Jenkinsfile)
 =======
 >>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
         stage('Checkout') {
+=======
+        stage('1. Checkout') {
+>>>>>>> 14e64bc26 (updated Jenkinsfile)
             steps {
                 checkout scm
             }
@@ -38,26 +43,13 @@ pipeline {
 =======
 >>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
 
-        stage('Environment Info') {
+        stage('2. Install, Lint & Test') {
             steps {
                 sh '''
-                    echo "========== Environment =========="
-                    node -v
-                    npm -v
-                    yarn -v
-                    git --version
-                '''
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh '''
+                    echo "Installing Dependencies..."
                     yarn install --frozen-lockfile
-                '''
-            }
-        }
 
+<<<<<<< HEAD
         stage('Lint') {
             steps {
 <<<<<<< HEAD
@@ -95,12 +87,25 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
+=======
+                    echo "Running Lint..."
+                    yarn lint
+
+                    echo "Running Unit Tests..."
+                    yarn test
+                '''
+            }
+        }
+
+        stage('3. SonarQube Analysis') {
+>>>>>>> 6b703f456 (updated Jenkinsfile)
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([
-                        string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')
+                        string(credentialsId: 'sonar-pat', variable: 'SONAR_TOKEN')
                     ]) {
-                        sh '''
+
+                        sh """
                         ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
 <<<<<<< HEAD
                         -Dsonar.projectKey=ChatStreamSDK \
@@ -118,22 +123,97 @@ pipeline {
                           -Dsonar.token=$SONAR_TOKEN
 >>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
                         '''
+=======
+                        -Dsonar.projectKey=ChatStream \
+                        -Dsonar.projectName=ChatStream \
+                        -Dsonar.sources=. \
+                        -Dsonar.sourceEncoding=UTF-8 \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.token=${SONAR_TOKEN}
+                        """
+>>>>>>> 6b703f456 (updated Jenkinsfile)
                     }
                 }
-            }
-        }
 
-        stage('Quality Gate') {
-            steps {
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        stage('Archive Artifacts') {
+        stage('4. Build APK') {
             steps {
-                archiveArtifacts artifacts: '**/lib/**, **/dist/**, **/*.tgz', fingerprint: true
+                sh '''
+                    echo "Building Release APK..."
+
+                    cd examples/android
+
+                    chmod +x gradlew
+
+                    ./gradlew clean
+
+                    ./gradlew assembleRelease
+                '''
+            }
+        }
+
+        stage('5. Archive & Upload APK') {
+            steps {
+
+                archiveArtifacts artifacts: 'examples/android/app/build/outputs/apk/release/*.apk',
+                                 fingerprint: true
+
+                withCredentials([
+                    string(credentialsId: 'storage-account-name', variable: 'STORAGE_ACCOUNT'),
+                    string(credentialsId: 'storage-account-key', variable: 'STORAGE_KEY')
+                ]) {
+
+                    sh '''
+                    echo "Uploading APK to Azure Blob Storage..."
+
+                    az storage blob upload \
+                      --account-name $STORAGE_ACCOUNT \
+                      --account-key $STORAGE_KEY \
+                      --container-name $STORAGE_CONTAINER \
+                      --file examples/android/app/build/outputs/apk/release/app-release.apk \
+                      --name ChatStream-${BUILD_NUMBER}.apk \
+                      --overwrite
+
+                    echo "APK uploaded successfully."
+                    '''
+                }
+            }
+        }
+
+        stage('6. Download & Verify APK') {
+            steps {
+
+                withCredentials([
+                    string(credentialsId: 'storage-account-name', variable: 'STORAGE_ACCOUNT'),
+                    string(credentialsId: 'storage-account-key', variable: 'STORAGE_KEY')
+                ]) {
+
+                    sh '''
+                    mkdir -p downloaded
+
+                    echo "Downloading APK from Azure Blob Storage..."
+
+                    az storage blob download \
+                      --account-name $STORAGE_ACCOUNT \
+                      --account-key $STORAGE_KEY \
+                      --container-name $STORAGE_CONTAINER \
+                      --name ChatStream-${BUILD_NUMBER}.apk \
+                      --file downloaded/ChatStream-${BUILD_NUMBER}.apk
+
+                    echo "Downloaded Artifact:"
+
+                    ls -lh downloaded/
+
+                    echo "Artifact verification completed successfully."
+
+                    echo "CD stage completed."
+                    '''
+                }
             }
         }
     }
@@ -144,11 +224,11 @@ pipeline {
 
 >>>>>>> fe7d0a0e2 (Updated Jenkinsfile)
         success {
-            echo 'CI Pipeline completed successfully.'
+            echo "React Native CI/CD Pipeline completed successfully."
         }
 
         failure {
-            echo 'CI Pipeline failed.'
+            echo "Pipeline failed."
         }
 
         always {
