@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -11,12 +12,6 @@ pipeline {
     }
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
 
         stage('Environment Check') {
             steps {
@@ -47,11 +42,19 @@ pipeline {
                 '''
             }
         }
+
+        stage('Lint') {
+            steps {
+                sh '''
+                    yarn lint
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo 'CI basic validation completed successfully.'
+            echo 'CI pipeline completed successfully.'
         }
 
         failure {
@@ -59,3 +62,4 @@ pipeline {
         }
     }
 }
+
