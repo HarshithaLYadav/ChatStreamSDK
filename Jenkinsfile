@@ -1,23 +1,19 @@
-
 pipeline {
     agent any
 
-    environment {
-        HOME = '/var/lib/jenkins'
-
-        ANDROID_HOME = '/home/azureuser/Android/Sdk'
-        ANDROID_SDK_ROOT = '/home/azureuser/Android/Sdk'
-
-        PATH = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
-    }
-
     stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
 
         stage('Environment Check') {
             steps {
                 sh '''
                     echo "===== Environment ====="
-                    echo "User: $(whoami)"
+                    whoami
                     echo "Workspace: $WORKSPACE"
 
                     echo "===== Node ====="
@@ -38,6 +34,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
+                    cd package
                     yarn install --frozen-lockfile
                 '''
             }
@@ -46,6 +43,7 @@ pipeline {
         stage('Lint') {
             steps {
                 sh '''
+                    cd package
                     yarn lint
                 '''
             }
@@ -54,7 +52,7 @@ pipeline {
 
     post {
         success {
-            echo 'CI pipeline completed successfully.'
+            echo 'CI validation completed successfully.'
         }
 
         failure {
@@ -62,4 +60,3 @@ pipeline {
         }
     }
 }
-
