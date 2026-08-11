@@ -1,88 +1,204 @@
 pipeline {
-
     agent any
 
+    tools {
+        nodejs 'Node20'
+        jdk 'JDK17'
+    }
+
     environment {
-        HOME = '/var/lib/jenkins'
+        GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
+        YARN_CACHE_FOLDER = "${WORKSPACE}/.yarn-cache"
 
-        ANDROID_HOME = '/home/azureuser/Android/Sdk'
-        ANDROID_SDK_ROOT = '/home/azureuser/Android/Sdk'
+        ANDROID_DIR = "examples/SampleApp/android"
+        APK_PATH = "examples/SampleApp/android/app/build/outputs/apk/release/app-release.apk"
+    }
 
-        PATH = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        skipDefaultCheckout(false)
+
+        // Keep only recent builds
+        buildDiscarder(
+            logRotator(
+                numToKeepStr: '5',
+                artifactNumToKeepStr: '5'
+            )
+        )
+
+        // Stop a stuck build
+        timeout(time: 60, unit: 'MINUTES')
     }
 
     stages {
 
-        // 1. Checkout source code
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // 2. Install JavaScript dependencies
+        stage('Environment') {
+            steps {
+                sh '''
+                    echo "===== SYSTEM ====="
+                    uname -a
+                    echo
+
+                    echo "===== CPU ====="
+                    nproc
+                    echo
+
+                    echo "===== MEMORY ====="
+                    free -h
+                    echo
+
+                    echo "===== DISK ====="
+                    df -h
+                    echo
+
+                    echo "===== NODE ====="
+                    node --version
+                    npm --version
+                    echo
+
+                    echo "===== YARN ====="
+                    yarn --version
+                    echo
+
+                    echo "===== JAVA ====="
+                    java -version
+                '''
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    node --version
-                    yarn --version
-                    yarn install --frozen-lockfile
+                    set -e
+
+                    echo "Installing dependencies..."
+
+                    yarn install \
+                        --frozen-lockfile \
+                        --prefer-offline \
+                        --non-interactive
                 '''
             }
         }
 
-        // 3. SonarQube code analysis
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'sonar-scanner'
+        stage('Quality Checks') {
+            parallel {
+
+                stage('Tests') {
+                    steps {
+                        sh '''
+                            set +e
+
+                            echo "Running tests..."
+
+                            yarn test \
+                                --runInBand \
+                                --watchAll=false \
+                                --passWithNoTests
+
+                            TEST_EXIT=$?
+
+                            echo "Test exit code: $TEST_EXIT"
+
+                            exit $TEST_EXIT
+                        '''
+                    }
+                }
+
+                stage('SonarQube Analysis') {
+                    steps {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''
+                                echo "Running SonarQube analysis..."
+
+                                sonar-scanner
+                            '''
+                        }
+                    }
                 }
             }
         }
 
-        // 4. Run tests and lint
-        stage('Tests') {
-            steps {
-                sh '''
-                    yarn lint || true
-                    yarn test --runInBand || true
-                '''
-            }
-        }
-
-        // 5. Build Android release APK
         stage('Android Release Build') {
             steps {
-                dir('examples/SampleApp/android') {
-                    sh '''
-                        chmod +x gradlew
-                        ./gradlew clean
-                        ./gradlew assembleRelease
-                    '''
-                }
+                sh '''
+                    set -e
+
+                    cd "$ANDROID_DIR"
+
+                    echo "Cleaning/building Android application..."
+
+                    chmod +x gradlew
+
+                    ./gradlew assembleRelease \
+                        --parallel \
+                        --build-cache \
+                        --daemon
+                '''
             }
         }
 
-        // 6. Archive APK
+        stage('Verify APK') {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "Checking APK..."
+
+                    if [ ! -f "$APK_PATH" ]; then
+                        echo "ERROR: APK was not generated!"
+                        exit 1
+                    fi
+
+                    echo
+                    echo "APK generated successfully:"
+                    ls -lh "$APK_PATH"
+
+                    echo
+                    echo "APK location:"
+                    realpath "$APK_PATH"
+                '''
+            }
+        }
+
         stage('Archive APK') {
             steps {
-                archiveArtifacts artifacts: 'examples/SampleApp/android/app/build/outputs/apk/release/*.apk',
-                                 fingerprint: true
+                archiveArtifacts artifacts: "${APK_PATH}",
+                    fingerprint: true,
+                    onlyIfSuccessful: true
             }
         }
     }
 
     post {
+
         success {
-            echo 'CI/CD pipeline completed successfully.'
+            echo '''
+            ==========================================
+                    BUILD SUCCESSFUL
+            ==========================================
+            APK has been archived by Jenkins.
+            '''
         }
 
         failure {
-            echo 'CI/CD pipeline failed. Check the stage logs.'
+            echo '''
+            ==========================================
+                    BUILD FAILED
+            ==========================================
+            Check the console log for the failed stage.
+            '''
         }
 
         always {
-            echo 'Pipeline execution finished.'
+            echo "Build finished: ${env.BUILD_NUMBER}"
         }
     }
 }
