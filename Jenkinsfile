@@ -36,7 +36,7 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Install Package Dependencies') {
             steps {
                 dir('package') {
                     sh '''
@@ -66,11 +66,32 @@ pipeline {
             }
         }
 
+        stage('Install SampleApp Dependencies') {
+            steps {
+                dir('examples/SampleApp') {
+                    sh '''
+                        echo "===== Installing SampleApp dependencies ====="
+                        yarn install --frozen-lockfile
+                    '''
+                }
+            }
+        }
+
         stage('Android Build') {
             steps {
                 dir('examples/SampleApp/android') {
                     sh '''
+                        echo "===== Android Build ====="
+
                         chmod +x gradlew
+
+                        echo "===== React Native Gradle Plugin ====="
+                        ls -la ../node_modules/@react-native/gradle-plugin
+
+                        echo "===== Gradle Version ====="
+                        ./gradlew --version
+
+                        echo "===== Building Release APK ====="
                         ./gradlew assembleRelease
                     '''
                 }
@@ -87,12 +108,17 @@ pipeline {
 
     post {
         success {
-            echo 'CI/CD pipeline completed successfully.'
+            echo '=========================================='
+            echo 'CI/CD PIPELINE COMPLETED SUCCESSFULLY'
+            echo '=========================================='
             echo 'Android APK has been built and archived.'
         }
 
         failure {
-            echo 'CI/CD pipeline failed.'
+            echo '=========================================='
+            echo 'CI/CD PIPELINE FAILED'
+            echo '=========================================='
+            echo 'Check the failed stage above.'
         }
 
         always {
