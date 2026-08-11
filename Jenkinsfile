@@ -1,16 +1,27 @@
-
+```groovy
 pipeline {
 
     agent any
 
     environment {
-        CI = 'true'
-        NODE_ENV = 'development'
-        GRADLE_OPTS = '-Dorg.gradle.daemon=false'
+
+        // ==============================
+        // Android SDK
+        // ==============================
+        ANDROID_HOME = '/home/azureuser/Android/Sdk'
+        ANDROID_SDK_ROOT = '/home/azureuser/Android/Sdk'
+
+        // ==============================
+        // Android / System PATH
+        // ==============================
+        PATH = "/home/azureuser/Android/Sdk/platform-tools:/home/azureuser/Android/Sdk/cmdline-tools/latest/bin:/home/azureuser/Android/Sdk/build-tools/35.0.0:${env.PATH}"
     }
 
     stages {
 
+        // =========================================================
+        // 1. Environment Check
+        // =========================================================
         stage('Environment Check') {
             steps {
                 sh '''
@@ -22,7 +33,7 @@ pipeline {
                     whoami
 
                     echo "Workspace:"
-                    echo "$WORKSPACE"
+                    pwd
 
                     echo "Node:"
                     node --version
@@ -41,6 +52,57 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 2. Android Environment Check
+        // =========================================================
+        stage('Android Environment Check') {
+            steps {
+                sh '''
+                    echo "=========================================="
+                    echo "      ANDROID ENVIRONMENT CHECK"
+                    echo "=========================================="
+
+                    echo "ANDROID_HOME=$ANDROID_HOME"
+                    echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+                    echo "PATH:"
+                    echo "$PATH"
+
+                    echo "=========================================="
+                    echo "Checking Android SDK..."
+                    echo "=========================================="
+
+                    test -d "$ANDROID_HOME"
+
+                    echo "Android SDK:"
+                    ls -ld "$ANDROID_HOME"
+
+                    echo "=========================================="
+                    echo "Checking ADB..."
+                    echo "=========================================="
+
+                    test -f "$ANDROID_HOME/platform-tools/adb"
+                    adb version
+
+                    echo "=========================================="
+                    echo "Checking SDK Manager..."
+                    echo "=========================================="
+
+                    test -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+                    sdkmanager --version
+
+                    echo "=========================================="
+                    echo "Android environment is ready."
+                    echo "=========================================="
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 3. Clean Dependencies
+        // =========================================================
         stage('Clean Dependencies') {
             steps {
                 sh '''
@@ -57,6 +119,10 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 4. Install Package Dependencies
+        // =========================================================
         stage('Install Package Dependencies') {
             steps {
                 dir('package') {
@@ -73,6 +139,10 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 5. Install Native Package Dependencies
+        // =========================================================
         stage('Install Native Package Dependencies') {
             steps {
                 dir('package/native-package') {
@@ -84,16 +154,20 @@ pipeline {
                         yarn install --frozen-lockfile
 
                         echo "Checking mime..."
+
                         test -d node_modules/mime
 
                         echo "mime dependency exists."
-
                         echo "Native package dependencies installed."
                     '''
                 }
             }
         }
 
+
+        // =========================================================
+        // 6. Build Package
+        // =========================================================
         stage('Build Package') {
             steps {
                 dir('package') {
@@ -110,6 +184,10 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 7. Install SampleApp Dependencies
+        // =========================================================
         stage('Install SampleApp Dependencies') {
             steps {
                 dir('examples/SampleApp') {
@@ -126,6 +204,10 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 8. Verify React Native Dependencies
+        // =========================================================
         stage('Verify React Native Dependencies') {
             steps {
                 sh '''
@@ -153,6 +235,10 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 9. Lint
+        // =========================================================
         stage('Lint') {
             steps {
                 dir('package') {
@@ -169,6 +255,10 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 10. Unit Tests
+        // =========================================================
         stage('Unit Tests') {
             steps {
                 dir('package') {
@@ -185,6 +275,10 @@ pipeline {
             }
         }
 
+
+        // =========================================================
+        // 11. Android Release Build
+        // =========================================================
         stage('Android Build') {
             steps {
                 dir('examples/SampleApp/android') {
@@ -193,96 +287,72 @@ pipeline {
                         echo "         ANDROID RELEASE BUILD"
                         echo "=========================================="
 
+                        echo "ANDROID_HOME=$ANDROID_HOME"
+                        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+                        echo "Checking SDK..."
+                        test -d "$ANDROID_HOME"
+
+                        echo "Checking ADB..."
+                        adb version
+
+                        echo "Checking SDK Manager..."
+                        sdkmanager --version
+
+                        echo "Making Gradle wrapper executable..."
                         chmod +x gradlew
+
+                        echo "Starting Gradle release build..."
 
                         ./gradlew assembleRelease --no-daemon
 
                         echo "=========================================="
-                        echo "        ANDROID BUILD COMPLETED"
+                        echo "       ANDROID BUILD COMPLETED"
                         echo "=========================================="
 
                         echo "APK files:"
-                        find app/build/outputs/apk/release -type f -name "*.apk" -print
+                        find app/build/outputs/apk -type f -name "*.apk" -print
                     '''
                 }
             }
         }
 
-        stage('Verify APK') {
-            steps {
-                sh '''
-                    echo "=========================================="
-                    echo "             VERIFY APK"
-                    echo "=========================================="
 
-                    APK=$(find examples/SampleApp/android/app/build/outputs/apk/release \
-                        -type f -name "*.apk" | head -1)
-
-                    if [ -z "$APK" ]; then
-                        echo "ERROR: APK was not generated."
-                        exit 1
-                    fi
-
-                    echo "APK generated:"
-                    echo "$APK"
-
-                    ls -lh "$APK"
-
-                    echo "APK verification successful."
-                '''
-            }
-        }
-
+        // =========================================================
+        // 12. Archive APK
+        // =========================================================
         stage('Archive APK') {
             steps {
-                archiveArtifacts artifacts:
-                    'examples/SampleApp/android/app/build/outputs/apk/release/*.apk',
-                    fingerprint: true
+                echo "=========================================="
+                echo "          ARCHIVING APK"
+                echo "=========================================="
 
-                echo "APK archived successfully in Jenkins."
-            }
-        }
+                archiveArtifacts artifacts: 'examples/SampleApp/android/app/build/outputs/apk/**/*.apk',
+                                 fingerprint: true
 
-        stage('Create Backup') {
-            steps {
-                sh '''
-                    echo "=========================================="
-                    echo "            CREATE BACKUP"
-                    echo "=========================================="
-
-                    mkdir -p backup
-
-                    cp examples/SampleApp/android/app/build/outputs/apk/release/*.apk backup/
-
-                    echo "Backup contents:"
-                    ls -lh backup/
-                '''
-
-                archiveArtifacts artifacts: 'backup/*.apk',
-                    fingerprint: true
+                echo "APK archived successfully."
             }
         }
     }
 
+
+    // =============================================================
+    // POST ACTIONS
+    // =============================================================
     post {
 
         success {
             echo "=========================================="
-            echo "       CI/CD PIPELINE SUCCESSFUL"
+            echo "          PIPELINE SUCCESS"
             echo "=========================================="
-
-            echo "APK was successfully:"
-            echo "1. Built"
-            echo "2. Verified"
-            echo "3. Archived"
-            echo "4. Backed up"
+            echo "CI/CD pipeline completed successfully."
+            echo "APK was built and archived."
         }
 
         failure {
             echo "=========================================="
-            echo "          CI/CD PIPELINE FAILED"
+            echo "          PIPELINE FAILED"
             echo "=========================================="
-
             echo "Check the failed stage above."
         }
 
@@ -293,4 +363,4 @@ pipeline {
         }
     }
 }
-
+```

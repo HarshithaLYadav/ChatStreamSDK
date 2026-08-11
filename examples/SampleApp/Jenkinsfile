@@ -1,0 +1,149 @@
+pipeline {
+
+    agent any
+
+    environment {
+        PACKAGE_DIR = 'package'
+        SAMPLE_APP_DIR = 'examples/SampleApp'
+        ANDROID_DIR = 'examples/SampleApp/android'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Environment Check') {
+            steps {
+                sh '''
+                    echo "===== Environment ====="
+                    echo "User: $(whoami)"
+                    echo "Workspace: $WORKSPACE"
+
+                    echo "===== Node ====="
+                    node --version
+
+                    echo "===== Yarn ====="
+                    yarn --version
+
+                    echo "===== Java ====="
+                    java -version
+
+                    echo "===== Git ====="
+                    git --version
+                '''
+            }
+        }
+
+        stage('Install Package Dependencies') {
+            steps {
+                dir("${PACKAGE_DIR}") {
+                    sh '''
+                        echo "===== Installing Package Dependencies ====="
+                        yarn install --frozen-lockfile
+                    '''
+                }
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                dir("${PACKAGE_DIR}") {
+                    sh '''
+                        echo "===== Running Lint ====="
+                        yarn lint
+                    '''
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                dir("${PACKAGE_DIR}") {
+                    sh '''
+                        echo "===== Running Unit Tests ====="
+                        yarn test:unit --passWithNoTests
+                    '''
+                }
+            }
+        }
+
+        stage('Install SampleApp Dependencies') {
+            steps {
+                dir("${SAMPLE_APP_DIR}") {
+                    sh '''
+                        echo "===== Installing SampleApp Dependencies ====="
+
+                        yarn install --frozen-lockfile
+
+                        echo "===== Verifying React Native Gradle Plugin ====="
+                        test -d node_modules/@react-native/gradle-plugin
+
+                        echo "React Native Gradle Plugin found successfully."
+                    '''
+                }
+            }
+        }
+
+        stage('Android Build') {
+            steps {
+                dir("${ANDROID_DIR}") {
+                    sh '''
+                        echo "===== Android Release Build ====="
+
+                        chmod +x gradlew
+
+                        ./gradlew assembleRelease --no-daemon
+                    '''
+                }
+            }
+        }
+
+        stage('Find APK') {
+            steps {
+                sh '''
+                    echo "===== Searching for APK ====="
+
+                    find "$WORKSPACE/examples/SampleApp/android" \
+                        -type f \
+                        -name "*.apk" \
+                        -print
+                '''
+            }
+        }
+
+        stage('Archive APK') {
+            steps {
+                archiveArtifacts(
+                    artifacts: 'examples/SampleApp/android/app/build/outputs/apk/release/*.apk',
+                    fingerprint: true
+                )
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo '======================================'
+            echo 'CI/CD PIPELINE COMPLETED SUCCESSFULLY'
+            echo '======================================'
+            echo 'APK has been archived by Jenkins.'
+        }
+
+        failure {
+            echo '======================================'
+            echo 'CI/CD PIPELINE FAILED'
+            echo '======================================'
+            echo 'Check the failed stage and console output.'
+        }
+
+        always {
+            echo 'Pipeline execution completed.'
+        }
+    }
+}
+
