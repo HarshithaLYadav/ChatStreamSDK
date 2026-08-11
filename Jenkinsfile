@@ -1,3 +1,4 @@
+```groovy
 pipeline {
 
     agent any
@@ -14,7 +15,7 @@ pipeline {
             steps {
                 sh '''
                     echo "===== Environment ====="
-                    whoami
+                    echo "User: $(whoami)"
                     echo "Workspace: $WORKSPACE"
 
                     echo "===== Node ====="
@@ -58,15 +59,26 @@ pipeline {
                 '''
             }
         }
+
+        stage('Android Build') {
+            steps {
+                sh '''
+                    cd examples/SampleApp/android
+                    chmod +x gradlew
+                    ./gradlew assembleRelease
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo 'CI validation completed successfully.'
+            echo 'CI validation and Android build completed successfully.'
         }
 
         failure {
-            echo 'CI validation failed.'
+            echo 'CI pipeline failed.'
         }
     }
 }
+```
