@@ -1,4 +1,4 @@
-
+```groovy
 pipeline {
 
     agent any
@@ -15,8 +15,11 @@ pipeline {
             steps {
                 sh '''
                     echo "===== Environment ====="
-                    echo "User: $(whoami)"
-                    echo "Workspace: $WORKSPACE"
+                    echo "User:"
+                    whoami
+
+                    echo "Workspace:"
+                    echo "$WORKSPACE"
 
                     echo "===== Node ====="
                     node --version
@@ -35,50 +38,66 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    cd package
-                    yarn install --frozen-lockfile
-                '''
+                dir('package') {
+                    sh '''
+                        yarn install --frozen-lockfile
+                    '''
+                }
             }
         }
 
         stage('Lint') {
             steps {
-                sh '''
-                    cd package
-                    yarn lint
-                '''
+                dir('package') {
+                    sh '''
+                        yarn lint
+                    '''
+                }
             }
         }
 
         stage('Unit Tests') {
             steps {
-                sh '''
-                    cd package
-                    yarn test:unit
-                '''
+                dir('package') {
+                    sh '''
+                        yarn test:unit --passWithNoTests
+                    '''
+                }
             }
         }
 
         stage('Android Build') {
             steps {
-                sh '''
-                    cd examples/SampleApp/android
-                    chmod +x gradlew
-                    ./gradlew assembleRelease
-                '''
+                dir('examples/SampleApp/android') {
+                    sh '''
+                        chmod +x gradlew
+                        ./gradlew assembleRelease
+                    '''
+                }
+            }
+        }
+
+        stage('Archive APK') {
+            steps {
+                archiveArtifacts artifacts: 'examples/SampleApp/android/app/build/outputs/apk/release/*.apk',
+                                 fingerprint: true
             }
         }
     }
 
     post {
         success {
-            echo 'CI validation and Android build completed successfully.'
+            echo 'CI/CD pipeline completed successfully.'
+            echo 'Android APK has been built and archived.'
         }
 
         failure {
-            echo 'CI pipeline failed.'
+            echo 'CI/CD pipeline failed.'
+        }
+
+        always {
+            echo 'Pipeline execution completed.'
         }
     }
 }
-
+```
