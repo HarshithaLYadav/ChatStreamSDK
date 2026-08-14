@@ -7,15 +7,12 @@ pipeline {
     }
 
     environment {
-    GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
-    YARN_CACHE_FOLDER = "${WORKSPACE}/.yarn-cache"
+        GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
+        YARN_CACHE_FOLDER = "${WORKSPACE}/.yarn-cache"
 
-    ANDROID_DIR = "examples/SampleApp/android"
-    APK_PATH = "examples/SampleApp/android/app/build/outputs/apk/release/app-release.apk"
-
-    KEYVAULT_NAME = "chatstream-key"
-    STORAGE_CONTAINER = "chatstreamapk8055"
-}
+        ANDROID_DIR = "examples/SampleApp/android"
+        APK_PATH = "examples/SampleApp/android/app/build/outputs/apk/release/app-release.apk"
+    }
 
     options {
         timestamps()
@@ -173,38 +170,39 @@ pipeline {
 
         stage('Archive APK') {
             steps {
+
                 archiveArtifacts artifacts: "${APK_PATH}",
                     fingerprint: true,
                     onlyIfSuccessful: true
+
+                withAzureKeyvault(
+                    keyVaultURLOverride: 'https://chatstream-kv.vault.azure.net/',
+                    credentialIDOverride: 'chatstream-jenkins-sp',
+                    azureKeyVaultSecrets: [
+                        [
+                            secretType: 'Secret',
+                            name: 'storage-account-name',
+                            envVariable: 'STORAGE_ACCOUNT'
+                        ],
+                        [
+                            secretType: 'Secret',
+                            name: 'storage-account-key',
+                            envVariable: 'STORAGE_KEY'
+                        ]
+                    ]
+                ) {
+                    sh '''
+                        az storage blob upload \
+                            --account-name "$STORAGE_ACCOUNT" \
+                            --account-key "$STORAGE_KEY" \
+                            --container-name "$STORAGE_CONTAINER" \
+                            --name "chatstream-sdk-${BUILD_NUMBER}.apk" \
+                            --file "$APK_PATH" \
+                            --overwrite true
+                    '''
+                }
             }
         }
-        withAzureKeyvault(
-    keyVaultURLOverride: 'https://chatstream-kv.vault.azure.net/',
-    credentialIDOverride: 'chatstream-jenkins-sp',
-    azureKeyVaultSecrets: [
-        [
-            secretType: 'Secret',
-            name: 'storage-account-name',
-            envVariable: 'STORAGE_ACCOUNT'
-        ],
-        [
-            secretType: 'Secret',
-            name: 'storage-account-key',
-            envVariable: 'STORAGE_KEY'
-        ]
-    ]
-) {
-    sh '''
-        az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --account-key "$STORAGE_KEY" \
-            --container-name "$STORAGE_CONTAINER" \
-            --name "chatstream-sdk-${BUILD_NUMBER}.apk" \
-            --file "$APK_PATH" \
-            --overwrite true
-    '''
-}
-}
     }
 
     post {
