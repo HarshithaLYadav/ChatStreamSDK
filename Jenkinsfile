@@ -178,61 +178,32 @@ pipeline {
                     onlyIfSuccessful: true
             }
         }
-        stage('Deploy APK to Azure Blob') {
-    steps {
-
         withAzureKeyvault(
-            keyVaultURLOverride: 'https://chatstream-key.vault.azure.net/',
-            credentialIDOverride: 'azure-managed-identity',
-            azureKeyVaultSecrets: [
-                [
-                    secretType: 'Secret',
-                    name: 'chatstreamapk8055',
-                    envVariable: 'STORAGE_ACCOUNT'
-                ],
-                [
-                    secretType: 'Secret',
-                    name: 'chatstream-key',
-                    envVariable: 'STORAGE_KEY'
-                ]
-            ]
-        ) {
-
-            sh '''
-                set -e
-
-                echo "=========================================="
-                echo "Uploading APK to Azure Blob Storage"
-                echo "=========================================="
-
-                if [ ! -f "$APK_PATH" ]; then
-                    echo "ERROR: APK not found!"
-                    exit 1
-                fi
-
-                BLOB_NAME="chatstream-sdk-${BUILD_NUMBER}.apk"
-
-                echo "Storage Account: $STORAGE_ACCOUNT"
-                echo "Container: $STORAGE_CONTAINER"
-                echo "Blob: $BLOB_NAME"
-                echo "File: $APK_PATH"
-
-                az storage blob upload \
-                    --account-name "$STORAGE_ACCOUNT" \
-                    --account-key "$STORAGE_KEY" \
-                    --container-name "$STORAGE_CONTAINER" \
-                    --name "$BLOB_NAME" \
-                    --file "$APK_PATH" \
-                    --overwrite true \
-                    --no-progress
-
-                echo
-                echo "=========================================="
-                echo "APK uploaded successfully!"
-                echo "=========================================="
-            '''
-        }
-    }
+    keyVaultURLOverride: 'https://chatstream-kv.vault.azure.net/',
+    credentialIDOverride: 'chatstream-jenkins-sp',
+    azureKeyVaultSecrets: [
+        [
+            secretType: 'Secret',
+            name: 'storage-account-name',
+            envVariable: 'STORAGE_ACCOUNT'
+        ],
+        [
+            secretType: 'Secret',
+            name: 'storage-account-key',
+            envVariable: 'STORAGE_KEY'
+        ]
+    ]
+) {
+    sh '''
+        az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT" \
+            --account-key "$STORAGE_KEY" \
+            --container-name "$STORAGE_CONTAINER" \
+            --name "chatstream-sdk-${BUILD_NUMBER}.apk" \
+            --file "$APK_PATH" \
+            --overwrite true
+    '''
+}
 }
     }
 
