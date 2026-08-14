@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'Node20'
-        jdk 'JDK17'
-    }
-
     environment {
         GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
         YARN_CACHE_FOLDER = "${WORKSPACE}/.yarn-cache"
