@@ -12,6 +12,8 @@ pipeline {
 
         ANDROID_DIR = "examples/SampleApp/android"
         APK_PATH = "examples/SampleApp/android/app/build/outputs/apk/release/app-release.apk"
+
+        STORAGE_CONTAINER = "apk-artifacts"
     }
 
     options {
@@ -19,7 +21,6 @@ pipeline {
         disableConcurrentBuilds()
         skipDefaultCheckout(false)
 
-        // Keep only recent builds
         buildDiscarder(
             logRotator(
                 numToKeepStr: '5',
@@ -27,7 +28,6 @@ pipeline {
             )
         )
 
-        // Stop a stuck build
         timeout(time: 60, unit: 'MINUTES')
     }
 
@@ -192,6 +192,10 @@ pipeline {
                     ]
                 ) {
                     sh '''
+                        set -e
+
+                        echo "Uploading APK to Azure Blob Storage..."
+
                         az storage blob upload \
                             --account-name "$STORAGE_ACCOUNT" \
                             --account-key "$STORAGE_KEY" \
@@ -199,6 +203,8 @@ pipeline {
                             --name "chatstream-sdk-${BUILD_NUMBER}.apk" \
                             --file "$APK_PATH" \
                             --overwrite true
+
+                        echo "APK uploaded successfully."
                     '''
                 }
             }
