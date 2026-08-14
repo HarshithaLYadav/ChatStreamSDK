@@ -16,6 +16,7 @@ pipeline {
         disableConcurrentBuilds()
         skipDefaultCheckout(false)
 
+        // Keep only recent builds
         buildDiscarder(
             logRotator(
                 numToKeepStr: '5',
@@ -23,6 +24,7 @@ pipeline {
             )
         )
 
+        // Stop a stuck build
         timeout(time: 60, unit: 'MINUTES')
     }
 
@@ -64,6 +66,14 @@ pipeline {
 
                     echo "===== JAVA ====="
                     java -version
+                    echo
+
+                    echo "===== SONAR SCANNER ====="
+                    sonar-scanner --version
+                    echo
+
+                    echo "===== AZURE CLI ====="
+                    az version
                 '''
             }
         }
