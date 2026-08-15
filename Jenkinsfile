@@ -245,7 +245,7 @@ pipeline {
 
                 archiveArtifacts(
                     artifacts: "${APK_PATH}",
-                    fingerprint: tru,
+                    fingerprint: true,
                     onlyIfSuccessful: true
                 )
             }
