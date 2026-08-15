@@ -206,7 +206,6 @@ pipeline {
                     chmod +x gradlew
 
                     ./gradlew assembleRelease \
-                        --parallel \
                         --build-cache \
                         --daemon
 
