@@ -259,7 +259,7 @@ pipeline {
                                     echo "Uploading APK to Azure Blob Storage..."
 
                                     az storage blob upload \
-                                        --account-name "chatstreamapk8055 " \
+                                        --account-name "chatstreamapk8055" \
                                         --container-name "stremchat-cont" \
                                         --name "app-release-${BUILD_NUMBER}.apk" \
                                         --file "$APK_PATH" \
