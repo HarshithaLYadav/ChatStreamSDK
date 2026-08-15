@@ -13,7 +13,7 @@ pipeline {
 
     AZURE_STORAGE_ACCOUNT = "chatstreamapk8055"
     AZURE_CONTAINER = "stremchat-cont"
-}
+} 
 
     options {
         timestamps()
