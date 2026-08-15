@@ -249,6 +249,8 @@ pipeline {
                     fingerprint: tru,
                     onlyIfSuccessful: true
                 )
+            }
+        }
         
         stage('Upload APK to Azure Blob') {
                     steps {
@@ -269,8 +271,6 @@ pipeline {
                                 '''
                         }
                     }
-            }
-        }
     }
 
     post {
