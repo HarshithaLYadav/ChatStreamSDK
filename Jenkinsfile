@@ -28,6 +28,11 @@ pipeline {
 
     stages {
 
+        /*
+         * Checkout is intentionally NOT defined here.
+         * Jenkins performs automatic SCM checkout.
+         */
+
         stage('Environment') {
             steps {
                 sh '''
@@ -37,35 +42,37 @@ pipeline {
                     echo "        ENVIRONMENT INFORMATION"
                     echo "=========================================="
 
-                    echo "CPU:"
+                    echo ""
+                    echo "===== SYSTEM ====="
+                    uname -a
+
+                    echo ""
+                    echo "===== CPU ====="
                     nproc
 
-                    echo
-                    echo "MEMORY:"
+                    echo ""
+                    echo "===== MEMORY ====="
                     free -h
 
-                    echo
-                    echo "DISK:"
+                    echo ""
+                    echo "===== DISK ====="
                     df -h
 
-                    echo
-                    echo "NODE:"
+                    echo ""
+                    echo "===== NODE ====="
                     node --version
-
-                    echo
-                    echo "NPM:"
                     npm --version
 
-                    echo
-                    echo "YARN:"
+                    echo ""
+                    echo "===== YARN ====="
                     yarn --version
 
-                    echo
-                    echo "JAVA:"
+                    echo ""
+                    echo "===== JAVA ====="
                     java -version
 
-                    echo
-                    echo "GRADLE:"
+                    echo ""
+                    echo "===== GRADLE ====="
                     cd "$ANDROID_DIR"
                     chmod +x gradlew
                     ./gradlew --version
@@ -90,75 +97,94 @@ pipeline {
             }
         }
 
-        stage('Code Quality') {
-            parallel {
+        stage('Quality & Security') {
+            steps {
 
-                stage('Lint') {
-                    steps {
-                        sh '''
-                            echo "Running lint..."
+                /*
+                 * Lint + Tests are temporarily non-blocking.
+                 * SonarQube remains mandatory.
+                 */
 
+                script {
+
+                    echo "=========================================="
+                    echo "       RUNNING LINT CHECK"
+                    echo "=========================================="
+
+                    def lintStatus = sh(
+                        script: '''
                             set +e
 
                             yarn lint
 
                             LINT_EXIT=$?
 
-                            if [ $LINT_EXIT -ne 0 ]; then
-                                echo ""
-                                echo "WARNING: Lint errors detected."
-                                echo "Lint is temporarily NON-BLOCKING."
-                                echo "Pipeline will continue."
-                                echo ""
-                            else
-                                echo "Lint passed successfully."
-                            fi
+                            echo "Lint exit code: $LINT_EXIT"
 
-                            exit 0
-                        '''
+                            exit $LINT_EXIT
+                        ''',
+                        returnStatus: true
+                    )
+
+                    if (lintStatus != 0) {
+                        echo "WARNING: Lint failed."
+                        echo "Lint is temporarily non-blocking."
+                        echo "Pipeline will continue."
+                    } else {
+                        echo "Lint passed successfully."
                     }
-                }
 
-                stage('Tests') {
-                    steps {
+
+                    echo "=========================================="
+                    echo "       RUNNING TEST CHECK"
+                    echo "=========================================="
+
+                    def testStatus = sh(
+                        script: '''
+                            set +e
+
+                            yarn test \
+                                --runInBand \
+                                --watchAll=false \
+                                --passWithNoTests
+
+                            TEST_EXIT=$?
+
+                            echo "Test exit code: $TEST_EXIT"
+
+                            exit $TEST_EXIT
+                        ''',
+                        returnStatus: true
+                    )
+
+                    if (testStatus != 0) {
+                        echo "WARNING: Tests failed or test script is unavailable."
+                        echo "Tests are temporarily non-blocking."
+                        echo "Pipeline will continue."
+                    } else {
+                        echo "Tests passed successfully."
+                    }
+
+
+                    echo "=========================================="
+                    echo "       RUNNING SONARQUBE ANALYSIS"
+                    echo "=========================================="
+
+                    withSonarQubeEnv('SonarQube') {
                         sh '''
-                            echo "Checking test configuration..."
+                            set -e
 
-                            if yarn run 2>/dev/null | grep -qE "^  test"; then
+                            echo "Starting SonarQube analysis..."
 
-                                echo "Test script found."
-                                echo "Running tests..."
+                            sonar-scanner
 
-                                yarn test \
-                                    --runInBand \
-                                    --watchAll=false \
-                                    --passWithNoTests
-
-                            else
-
-                                echo "WARNING: No test script found in package.json."
-                                echo "Tests are temporarily skipped."
-                                echo "Pipeline will continue."
-
-                            fi
-
-                            exit 0
+                            echo "SonarQube analysis completed successfully."
                         '''
                     }
-                }
 
-                stage('SonarQube Analysis') {
-                    steps {
-                        withSonarQubeEnv('SonarQube') {
-                            sh '''
-                                set -e
-
-                                echo "Running SonarQube analysis..."
-
-                                sonar-scanner
-                            '''
-                        }
-                    }
+                    echo "=========================================="
+                    echo "       QUALITY & SECURITY COMPLETE"
+                    echo "=========================================="
                 }
             }
         }
@@ -186,22 +212,33 @@ pipeline {
             }
         }
 
-        stage('Archive APK') {
+        stage('Verify & Archive APK') {
             steps {
                 sh '''
                     set -e
 
-                    echo "Checking APK..."
+                    echo "=========================================="
+                    echo "          VERIFYING APK"
+                    echo "=========================================="
 
                     if [ ! -f "$APK_PATH" ]; then
                         echo "ERROR: APK was not generated."
-                        echo "Expected:"
+                        echo "Expected location:"
                         echo "$APK_PATH"
                         exit 1
                     fi
 
+                    echo ""
                     echo "APK generated successfully:"
                     ls -lh "$APK_PATH"
+
+                    echo ""
+                    echo "APK absolute path:"
+                    realpath "$APK_PATH"
+
+                    echo "=========================================="
+                    echo "             APK READY"
+                    echo "=========================================="
                 '''
 
                 archiveArtifacts(
@@ -220,7 +257,7 @@ pipeline {
 ==========================================
           BUILD SUCCESSFUL
 ==========================================
-Android APK has been archived by Jenkins.
+APK successfully built and archived.
 ==========================================
 '''
         }
@@ -230,7 +267,7 @@ Android APK has been archived by Jenkins.
 ==========================================
             BUILD FAILED
 ==========================================
-Check the failed stage in the console log.
+Check the console log for the failed stage.
 ==========================================
 '''
         }
