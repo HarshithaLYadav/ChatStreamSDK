@@ -28,11 +28,12 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
+        /*
+         * Jenkins automatically performs:
+         * Declarative: Checkout SCM
+         *
+         * No manual checkout stage is required.
+         */
 
         stage('Environment') {
             steps {
@@ -101,6 +102,34 @@ pipeline {
 
         stage('Quality Checks') {
             parallel {
+
+                stage('Lint') {
+                    steps {
+                        sh '''
+                            echo "=========================================="
+                            echo "           RUNNING LINT"
+                            echo "=========================================="
+
+                            set +e
+
+                            yarn lint
+
+                            LINT_EXIT=$?
+
+                            if [ $LINT_EXIT -ne 0 ]; then
+                                echo ""
+                                echo "WARNING: Lint errors detected."
+                                echo "Lint is temporarily non-blocking."
+                                echo "Pipeline will continue."
+                                echo ""
+                            else
+                                echo "Lint passed successfully."
+                            fi
+
+                            exit 0
+                        '''
+                    }
+                }
 
                 stage('Tests') {
                     steps {
