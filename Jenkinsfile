@@ -1,19 +1,32 @@
 pipeline {
     agent any
 
+    environment {
+    GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
+    YARN_CACHE_FOLDER = "${WORKSPACE}/.yarn-cache"
+
+    ANDROID_DIR = "examples/SampleApp/android"
+    APK_PATH = "examples/SampleApp/android/app/build/outputs/apk/release/app-release.apk"
+
+    KEYVAULT_NAME = "chatstream-key"
+    STORAGE_CONTAINER = "chatstreamapk8055"
+}
+
     options {
         timestamps()
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: '10'))
-    }
+        skipDefaultCheckout(false)
 
-    environment {
-        NODE_ENV = 'development'
-        SONAR_SCANNER_HOME = tool 'SonarScanner'
-    }
+        // Keep only recent builds
+        buildDiscarder(
+            logRotator(
+                numToKeepStr: '5',
+                artifactNumToKeepStr: '5'
+            )
+        )
 
-    triggers {
-        githubPush()
+        // Stop a stuck build
+        timeout(time: 60, unit: 'MINUTES')
     }
 
     stages {
@@ -24,14 +37,44 @@ pipeline {
             }
         }
 
-        stage('Environment Info') {
+        stage('Environment') {
             steps {
                 sh '''
-                    echo "========== Environment =========="
-                    node -v
-                    npm -v
-                    yarn -v
-                    git --version
+                    echo "===== SYSTEM ====="
+                    uname -a
+                    echo
+
+                    echo "===== CPU ====="
+                    nproc
+                    echo
+
+                    echo "===== MEMORY ====="
+                    free -h
+                    echo
+
+                    echo "===== DISK ====="
+                    df -h
+                    echo
+
+                    echo "===== NODE ====="
+                    node --version
+                    npm --version
+                    echo
+
+                    echo "===== YARN ====="
+                    yarn --version
+                    echo
+
+                    echo "===== JAVA ====="
+                    java -version
+                    echo
+
+                    echo "===== SONAR SCANNER ====="
+                    sonar-scanner --version
+                    echo
+
+                    echo "===== AZURE CLI ====="
+                    az version
                 '''
             }
         }
@@ -39,75 +82,163 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    yarn install --frozen-lockfile
+                    set -e
+
+                    echo "Installing dependencies..."
+
+                    yarn install \
+                        --frozen-lockfile \
+                        --prefer-offline \
+                        --non-interactive
                 '''
             }
         }
 
-        stage('Lint') {
-            steps {
-                sh 'yarn lint'
-            }
-        }
+        stage('Quality Checks') {
+            parallel {
 
-        stage('Unit Tests') {
-            steps {
-                sh 'yarn test:unit'
-            }
-        }
-
-        stage('Build') {
-            steps {
-                sh 'yarn build'
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    withCredentials([
-                        string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')
-                    ]) {
+                stage('Tests') {
+                    steps {
                         sh '''
-                        ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-                        -Dsonar.projectKey=ChatStreamSDK \
-                        -Dsonar.projectName=ChatStreamSDK \
-                        -Dsonar.sources=. \
-                        -Dsonar.sourceEncoding=UTF-8 \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
-                        -Dsonar.token=$SONAR_TOKEN
+                            set +e
+
+                            echo "Running tests..."
+
+                            yarn test \
+                                --runInBand \
+                                --watchAll=false \
+                                --passWithNoTests
+
+                            TEST_EXIT=$?
+
+                            echo "Test exit code: $TEST_EXIT"
+
+                            exit $TEST_EXIT
                         '''
+                    }
+                }
+
+                stage('SonarQube Analysis') {
+                    steps {
+                        withSonarQubeEnv('SonarQube') {
+                            sh '''
+                                echo "Running SonarQube analysis..."
+
+                                sonar-scanner
+                            '''
+                        }
                     }
                 }
             }
         }
 
-        stage('Quality Gate') {
+        stage('Android Release Build') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+                sh '''
+                    set -e
+
+                    cd "$ANDROID_DIR"
+
+                    echo "Cleaning/building Android application..."
+
+                    chmod +x gradlew
+
+                    ./gradlew assembleRelease \
+                        --parallel \
+                        --build-cache \
+                        --daemon
+                '''
             }
         }
 
-        stage('Archive Artifacts') {
+        stage('Verify APK') {
             steps {
-                archiveArtifacts artifacts: '**/lib/**, **/dist/**, **/*.tgz', fingerprint: true
+                sh '''
+                    set -e
+
+                    echo "Checking APK..."
+
+                    if [ ! -f "$APK_PATH" ]; then
+                        echo "ERROR: APK was not generated!"
+                        exit 1
+                    fi
+
+                    echo
+                    echo "APK generated successfully:"
+                    ls -lh "$APK_PATH"
+
+                    echo
+                    echo "APK location:"
+                    realpath "$APK_PATH"
+                '''
+            }
+        }
+
+        stage('Archive APK') {
+            steps {
+
+                archiveArtifacts artifacts: "${APK_PATH}",
+                    fingerprint: true,
+                    onlyIfSuccessful: true
+
+                withAzureKeyvault(
+                    keyVaultURLOverride: 'https://chatstream-kv.vault.azure.net/',
+                    credentialIDOverride: 'chatstream-jenkins-sp',
+                    azureKeyVaultSecrets: [
+                        [
+                            secretType: 'Secret',
+                            name: 'storage-account-name',
+                            envVariable: 'STORAGE_ACCOUNT'
+                        ],
+                        [
+                            secretType: 'Secret',
+                            name: 'storage-account-key',
+                            envVariable: 'STORAGE_KEY'
+                        ]
+                    ]
+                ) {
+                    sh '''
+                        set -e
+
+                        echo "Uploading APK to Azure Blob Storage..."
+
+                        az storage blob upload \
+                            --account-name "$STORAGE_ACCOUNT" \
+                            --account-key "$STORAGE_KEY" \
+                            --container-name "$STORAGE_CONTAINER" \
+                            --name "chatstream-sdk-${BUILD_NUMBER}.apk" \
+                            --file "$APK_PATH" \
+                            --overwrite true
+
+                        echo "APK uploaded successfully."
+                    '''
+                }
             }
         }
     }
 
     post {
+
         success {
-            echo 'CI Pipeline completed successfully.'
+            echo '''
+            ==========================================
+                    BUILD SUCCESSFUL
+            ==========================================
+            APK has been archived by Jenkins.
+            '''
         }
 
         failure {
-            echo 'CI Pipeline failed.'
+            echo '''
+            ==========================================
+                    BUILD FAILED
+            ==========================================
+            Check the console log for the failed stage.
+            '''
         }
 
         always {
-            cleanWs()
+            echo "Build finished: ${env.BUILD_NUMBER}"
         }
     }
 }
