@@ -31,8 +31,6 @@ pipeline {
         /*
          * Jenkins automatically performs:
          * Declarative: Checkout SCM
-         *
-         * No manual checkout stage is required.
          */
 
         stage('Environment') {
@@ -106,9 +104,7 @@ pipeline {
                 stage('Lint') {
                     steps {
                         sh '''
-                            echo "=========================================="
-                            echo "           RUNNING LINT"
-                            echo "=========================================="
+                            echo "Running lint..."
 
                             set +e
 
@@ -175,7 +171,9 @@ pipeline {
 
                     cd "$ANDROID_DIR"
 
-                    echo "Building Android release APK..."
+                    echo "=========================================="
+                    echo "       ANDROID RELEASE BUILD"
+                    echo "=========================================="
 
                     chmod +x gradlew
 
@@ -183,6 +181,9 @@ pipeline {
                         --parallel \
                         --build-cache \
                         --daemon
+
+                    echo
+                    echo "Android release build completed."
                 '''
             }
         }
@@ -192,32 +193,45 @@ pipeline {
                 sh '''
                     set -e
 
+                    echo "=========================================="
+                    echo "             VERIFY APK"
+                    echo "=========================================="
+
                     echo "Checking APK..."
 
                     if [ ! -f "$APK_PATH" ]; then
+                        echo ""
                         echo "ERROR: APK was not generated!"
-                        echo "Expected location: $APK_PATH"
+                        echo "Expected location:"
+                        echo "$APK_PATH"
                         exit 1
                     fi
 
-                    echo
+                    echo ""
                     echo "APK generated successfully:"
                     ls -lh "$APK_PATH"
 
-                    echo
+                    echo ""
                     echo "APK location:"
                     realpath "$APK_PATH"
+
+                    echo ""
+                    echo "APK verification completed successfully."
                 '''
             }
         }
 
         stage('Archive APK') {
             steps {
+                echo "Archiving APK..."
+
                 archiveArtifacts(
                     artifacts: "${APK_PATH}",
                     fingerprint: true,
                     onlyIfSuccessful: true
                 )
+
+                echo "APK archived successfully."
             }
         }
     }
@@ -229,7 +243,7 @@ pipeline {
 ==========================================
         BUILD SUCCESSFUL
 ==========================================
-APK has been archived by Jenkins.
+APK has been built, verified and archived.
 ==========================================
 '''
         }
