@@ -2,11 +2,6 @@ pipeline {
 
     agent any
 
-    tools {
-        nodejs 'Node20'
-        jdk 'JDK17'
-    }
-
     environment {
         GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
         YARN_CACHE_FOLDER = "${WORKSPACE}/.yarn-cache"
@@ -41,6 +36,13 @@ pipeline {
         stage('Environment') {
             steps {
                 sh '''
+                    set -e
+
+                    echo "=========================================="
+                    echo "          ENVIRONMENT INFORMATION"
+                    echo "=========================================="
+
+                    echo
                     echo "===== SYSTEM ====="
                     uname -a
 
@@ -68,6 +70,14 @@ pipeline {
                     echo
                     echo "===== JAVA ====="
                     java -version
+
+                    echo
+                    echo "===== GRADLE ====="
+                    cd "$ANDROID_DIR"
+                    ./gradlew --version
+
+                    echo
+                    echo "=========================================="
                 '''
             }
         }
@@ -115,6 +125,8 @@ pipeline {
                     steps {
                         withSonarQubeEnv('SonarQube') {
                             sh '''
+                                set -e
+
                                 echo "Running SonarQube analysis..."
 
                                 sonar-scanner
@@ -132,7 +144,7 @@ pipeline {
 
                     cd "$ANDROID_DIR"
 
-                    echo "Cleaning/building Android application..."
+                    echo "Building Android release APK..."
 
                     chmod +x gradlew
 
@@ -153,6 +165,7 @@ pipeline {
 
                     if [ ! -f "$APK_PATH" ]; then
                         echo "ERROR: APK was not generated!"
+                        echo "Expected location: $APK_PATH"
                         exit 1
                     fi
 
@@ -182,20 +195,22 @@ pipeline {
 
         success {
             echo '''
-            ==========================================
-                    BUILD SUCCESSFUL
-            ==========================================
-            APK has been archived by Jenkins.
-            '''
+==========================================
+        BUILD SUCCESSFUL
+==========================================
+APK has been archived by Jenkins.
+==========================================
+'''
         }
 
         failure {
             echo '''
-            ==========================================
-                    BUILD FAILED
-            ==========================================
-            Check the console log for the failed stage.
-            '''
+==========================================
+          BUILD FAILED
+==========================================
+Check the console log for the failed stage.
+==========================================
+'''
         }
 
         always {
