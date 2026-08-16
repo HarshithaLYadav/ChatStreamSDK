@@ -1,3 +1,4 @@
+```groovy
 pipeline {
 
     agent {
@@ -87,12 +88,16 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "Installing dependencies..."
+                    echo "=========================================="
+                    echo "       INSTALLING DEPENDENCIES"
+                    echo "=========================================="
 
                     yarn install \
                         --frozen-lockfile \
                         --prefer-offline \
                         --non-interactive
+
+                    echo "Dependencies installed successfully."
                 '''
             }
         }
@@ -102,7 +107,7 @@ pipeline {
 
                 /*
                  * Lint + Tests are temporarily non-blocking.
-                 * SonarQube remains mandatory.
+                 * SonarQube analysis remains mandatory.
                  */
 
                 script {
@@ -183,9 +188,39 @@ pipeline {
                     }
 
                     echo "=========================================="
-                    echo "       QUALITY & SECURITY COMPLETE"
+                    echo "       SONARQUBE ANALYSIS COMPLETE"
                     echo "=========================================="
                 }
+            }
+        }
+
+        /*
+         * SonarQube Quality Gate
+         *
+         * Jenkins waits for SonarQube to finish processing
+         * the analysis and return the Quality Gate result.
+         *
+         * If the Quality Gate fails, abortPipeline: true
+         * immediately stops the pipeline.
+         */
+
+        stage('Quality Gate') {
+            steps {
+
+                echo "=========================================="
+                echo "       WAITING FOR SONARQUBE QUALITY GATE"
+                echo "=========================================="
+
+                timeout(time: 5, unit: 'MINUTES') {
+
+                    waitForQualityGate(
+                        abortPipeline: true
+                    )
+                }
+
+                echo "=========================================="
+                echo "       SONARQUBE QUALITY GATE PASSED"
+                echo "=========================================="
             }
         }
 
@@ -214,6 +249,7 @@ pipeline {
 
         stage('Verify & Archive APK') {
             steps {
+
                 sh '''
                     set -e
 
@@ -257,6 +293,7 @@ pipeline {
 ==========================================
           BUILD SUCCESSFUL
 ==========================================
+SonarQube Quality Gate: PASSED
 APK successfully built and archived.
 ==========================================
 '''
@@ -267,6 +304,9 @@ APK successfully built and archived.
 ==========================================
             BUILD FAILED
 ==========================================
+The pipeline failed before successful completion.
+If the Quality Gate failed, the Android build
+was intentionally blocked.
 Check the console log for the failed stage.
 ==========================================
 '''
@@ -277,3 +317,4 @@ Check the console log for the failed stage.
         }
     }
 }
+```
