@@ -1,4 +1,4 @@
-```groovy
+
 pipeline {
 
     agent {
@@ -317,4 +317,4 @@ Check the console log for the failed stage.
         }
     }
 }
-```
+
