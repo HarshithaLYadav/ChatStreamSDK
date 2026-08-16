@@ -31,10 +31,6 @@ pipeline {
 
     stages {
 
-        /*
-         * Checkout is intentionally NOT defined here.
-         * Jenkins performs automatic SCM checkout.
-         */
 
         stage('Environment') {
             steps {
