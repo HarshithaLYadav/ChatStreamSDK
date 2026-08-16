@@ -1,4 +1,3 @@
-
 pipeline {
 
     agent {
@@ -30,7 +29,6 @@ pipeline {
     stages {
 
         /*
-         * Checkout is intentionally NOT defined here.
          * Jenkins performs automatic SCM checkout.
          */
 
@@ -104,12 +102,6 @@ pipeline {
 
         stage('Quality & Security') {
             steps {
-
-                /*
-                 * Lint + Tests are temporarily non-blocking.
-                 * SonarQube analysis remains mandatory.
-                 */
-
                 script {
 
                     echo "=========================================="
@@ -194,16 +186,6 @@ pipeline {
             }
         }
 
-        /*
-         * SonarQube Quality Gate
-         *
-         * Jenkins waits for SonarQube to finish processing
-         * the analysis and return the Quality Gate result.
-         *
-         * If the Quality Gate fails, abortPipeline: true
-         * immediately stops the pipeline.
-         */
-
         stage('Quality Gate') {
             steps {
 
@@ -212,10 +194,7 @@ pipeline {
                 echo "=========================================="
 
                 timeout(time: 5, unit: 'MINUTES') {
-
-                    waitForQualityGate(
-                        abortPipeline: true
-                    )
+                    waitForQualityGate abortPipeline: true
                 }
 
                 echo "=========================================="
@@ -305,8 +284,10 @@ APK successfully built and archived.
             BUILD FAILED
 ==========================================
 The pipeline failed before successful completion.
+
 If the Quality Gate failed, the Android build
 was intentionally blocked.
+
 Check the console log for the failed stage.
 ==========================================
 '''
@@ -317,4 +298,3 @@ Check the console log for the failed stage.
         }
     }
 }
-
