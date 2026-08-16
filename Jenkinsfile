@@ -113,30 +113,17 @@ pipeline {
                     echo "=========================================="
                     echo "       RUNNING LINT CHECK"
                     echo "=========================================="
+                    sh '''
+                        set -e
 
-                    def lintStatus = sh(
-                        script: '''
-                            set +e
+                          yarn lint
 
-                            yarn lint
+                       echo "Lint passed successfully."
+                       '''
 
-                            LINT_EXIT=$?
-
-                            echo "Lint exit code: $LINT_EXIT"
-
-                            exit $LINT_EXIT
-                        ''',
-                        returnStatus: true
-                    )
-
-                    if (lintStatus != 0) {
-                        echo "WARNING: Lint failed."
-                        echo "Lint is temporarily non-blocking."
-                        echo "Pipeline will continue."
-                    } else {
-                        echo "Lint passed successfully."
-                    }
-
+                    echo "=========================================="
+                    echo "       LINT CHECK COMPLETE"
+                    echo "=========================================="
 
                     echo "=========================================="
                     echo "       RUNNING TEST CHECK"
